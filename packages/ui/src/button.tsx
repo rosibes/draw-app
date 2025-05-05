@@ -1,4 +1,3 @@
-// packages/ui/src/button.tsx
 "use client";
 
 import { ReactNode } from "react";
