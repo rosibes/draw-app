@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from "react";
+import { ReactNode, ReactElement } from "react";
 
 interface ButtonProps {
   variant: "primary" | "secondary";
@@ -9,19 +9,21 @@ interface ButtonProps {
   className?: string;
   appName?: string;
   onClick?: () => void;
+  startIcon?: ReactElement;
+  endIcon?: ReactElement;
 }
 
 const variantStyle = {
-  primary: "bg-purple-600 text-white",
-  secondary: "bg-purple-100 text-purple-600",
+  primary: "bg-primary text-white hover:bg-secondary",
+  secondary: "text-gray-700 hover:bg-gray-100",
 };
 
 const defaultStyles = "rounded-md flex cursor-pointer";
 
 const sizeStyles = {
-  sm: "py-2 px-3",
-  md: "py-3 px-5",
-  lg: "py-4 px-7",
+  sm: "py-1 px-3",
+  md: "py-2 px-5",
+  lg: "py-3 px-7",
 };
 
 export const Button = ({
@@ -30,13 +32,17 @@ export const Button = ({
   onClick,
   variant,
   size,
+  startIcon,
+  endIcon
 }: ButtonProps) => {
   return (
     <button
       onClick={onClick}
       className={`${defaultStyles} ${variantStyle[variant]} ${sizeStyles[size]} ${className}`}
     >
+      {startIcon ? <div className="pr-2 flex items-center">{startIcon}</div> : null}
       {children}
+      {endIcon}
     </button>
   );
 };

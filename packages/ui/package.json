@@ -5,7 +5,9 @@
   "exports": {
     "./*": "./src/*.tsx",
     "./button": "./src/button.tsx",
-    "./input": "./src/input.tsx"
+    "./input": "./src/input.tsx",
+    "./header": "./src/header.tsx",
+    "./title": "./src/title.tsx"
   },
   "scripts": {
     "lint": "eslint . --max-warnings 0",
@@ -23,7 +25,10 @@
     "typescript": "5.8.2"
   },
   "dependencies": {
+    "framer-motion": "^12.9.7",
+    "lucide-react": "^0.507.0",
     "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react-dom": "^19.1.0",
+    "react-icons": "^5.5.0"
   }
 }
