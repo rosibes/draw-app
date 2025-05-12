@@ -1,178 +1,262 @@
+import { ShapeManager } from "./managers/ShapeManager";
+import { SocketService } from "./services/SocketService";
+import { Circle } from "./shapes/Circle";
+import { Rectangle } from "./shapes/Rectangle";
 import { Tool } from "@/components/Canvas";
-import { getExistingShapes } from "./http";
-
-type Shape = {
-    type: "rect",
-    x: number,
-    y: number,
-    width: number,
-    height: number
-} | {
-    type: "circle",
-    centerX: number,
-    centerY: number,
-    radius: number
-} | {
-    type: "pencil",
-    startX: number,
-    startY: number,
-    endX: number,
-    endY: number
-}
+import { IShape } from "./shapes/IShape";
+import { Pencil } from "./shapes/Pencil";
 
 export class Game {
-
-    private canvas: HTMLCanvasElement;
-    private ctx: CanvasRenderingContext2D;
-    private existingShapes: Shape[];
-    private roomId: string;
-    private socket: WebSocket;
-    private clicked: boolean;
+    private shapeManager = new ShapeManager();
+    private socketService: SocketService;
+    private selectedTool: Tool = "circle";
+    private clicked = false;
+    private isPanning = false;
     private startX = 0;
     private startY = 0;
-    private selectedTool: Tool = "circle"
+    private currentPencilPoints: { x: number; y: number }[] = [];
+    private zoom = 1;
+    private offsetX = 0;
+    private offsetY = 0;
+    private lastPanX = 0;
+    private lastPanY = 0;
+    private isSpacePressed = false;
 
-    constructor(canvas: HTMLCanvasElement, roomId: string, socket: WebSocket) {
-        this.canvas = canvas
-        this.ctx = canvas.getContext("2d")!;
-        this.existingShapes = [];
-        this.roomId = roomId;
-        this.socket = socket;
-        this.clicked = false;
-        this.init();
+    constructor(
+        private canvas: HTMLCanvasElement,
+        private roomId: string,
+        socket: WebSocket
+    ) {
+        const ctx = canvas.getContext("2d")!;
+        this.socketService = new SocketService(socket, roomId);
+        this.initialize(ctx);
         this.initHandlers();
         this.initMouseHandlers();
+        this.initKeyboardHandlers();
     }
 
-    destroy() {
-        this.canvas.removeEventListener("mousedown", this.mouseDownHandler)
-        this.canvas.removeEventListener("mouseup", this.mouseUpHandler)
-        this.canvas.removeEventListener("mousemove", this.mouseMoveHandler);
+    private initHandlers() {
+        this.socketService.onShapeReceived((shape) => {
+            this.shapeManager.addShape(shape);
+            this.redrawCanvas();
+        });
     }
 
-    setTool(tool: "circle" | "rect" | "pencil") {
-        this.selectedTool = tool;
-    }
-
-    async init() {
-        this.existingShapes = await getExistingShapes(this.roomId)
-        this.clearCanvas()
-    }
-
-    initHandlers() {
-        // Când serverul trimite un mesaj (broadcast), îl primesc aici
-        this.socket.onmessage = (event) => {             // asta e primit din serverul din be, adica de broadcastul facut de el
-            const message = JSON.parse(event.data)
-
-            if (message.type == "chat") {
-                const parsedShape = JSON.parse(message.message);
-                this.existingShapes.push(parsedShape);
-                this.clearCanvas()
-            }
+    private async initialize(ctx: CanvasRenderingContext2D) {
+        try {
+            await this.shapeManager.loadInitialShapes(this.roomId);
+            this.shapeManager.clearAndDraw(ctx, this.canvas.width, this.canvas.height);
+        } catch (error) {
+            console.error("Initialization failed:", error);
         }
     }
 
-    clearCanvas() {
-        this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        this.ctx.fillStyle = "rgba(0,0,0)"
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    public redrawCanvas() {
+        const ctx = this.canvas.getContext("2d")!;
+        ctx.save();
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
 
-        this.existingShapes.map((shape) => {
-            if (shape.type === "rect") {
-                this.ctx.strokeStyle = "rgba(255,255,255)"
-                this.ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
-            } else if (shape.type === "circle") {
-                this.ctx.strokeStyle = "rgba(255,255,255)"
-                this.ctx.beginPath();
-                this.ctx.arc(shape.centerX, shape.centerY, Math.abs(shape.radius), 0, Math.PI * 2);
-                this.ctx.stroke();
+        // Apply zoom and pan transformations
+        ctx.translate(this.offsetX, this.offsetY);
+        ctx.scale(this.zoom, this.zoom);
+
+        this.shapeManager.clearAndDraw(ctx, this.canvas.width / this.zoom, this.canvas.height / this.zoom);
+        ctx.restore();
+    }
+
+    private wheelHandler = (e: WheelEvent) => {
+        e.preventDefault();
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Convert mouse position to canvas coordinates
+        const canvasX = (mouseX - this.offsetX) / this.zoom;
+        const canvasY = (mouseY - this.offsetY) / this.zoom;
+
+        const delta = e.deltaY;
+        const zoomFactor = delta < 0 ? 1.1 : 1 / 1.1;
+        const newZoom = Math.min(Math.max(this.zoom * zoomFactor, 0.2), 5);
+
+        // Calculate new offset to keep the mouse position fixed
+        this.offsetX = mouseX - canvasX * newZoom;
+        this.offsetY = mouseY - canvasY * newZoom;
+        this.zoom = newZoom;
+
+        this.redrawCanvas();
+    };
+
+    public zoomIn() {
+        // Zoom in from center when using buttons
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+        const canvasX = (centerX - this.offsetX) / this.zoom;
+        const canvasY = (centerY - this.offsetY) / this.zoom;
+
+        this.zoom = Math.min(this.zoom * 1.1, 5);
+        this.offsetX = centerX - canvasX * this.zoom;
+        this.offsetY = centerY - canvasY * this.zoom;
+        this.redrawCanvas();
+    }
+
+    public zoomOut() {
+        // Zoom out from center when using buttons
+        const centerX = this.canvas.width / 2;
+        const centerY = this.canvas.height / 2;
+        const canvasX = (centerX - this.offsetX) / this.zoom;
+        const canvasY = (centerY - this.offsetY) / this.zoom;
+
+        this.zoom = Math.max(this.zoom / 1.1, 0.2);
+        this.offsetX = centerX - canvasX * this.zoom;
+        this.offsetY = centerY - canvasY * this.zoom;
+        this.redrawCanvas();
+    }
+
+    public resetZoom() {
+        this.zoom = 1;
+        this.offsetX = 0;
+        this.offsetY = 0;
+        this.redrawCanvas();
+    }
+
+    setTool(tool: Tool) {
+        this.selectedTool = tool;
+    }
+
+    private mouseDownHandler = (e: MouseEvent) => {
+        // Start panning on right click or space + left click
+        if (e.button === 2 || (e.button === 0 && this.isSpacePressed)) {
+            this.isPanning = true;
+            this.lastPanX = e.clientX;
+            this.lastPanY = e.clientY;
+            this.canvas.style.cursor = 'grabbing';
+            return;
+        }
+
+        // Normal drawing behavior
+        this.clicked = true;
+        const rect = this.canvas.getBoundingClientRect();
+        this.startX = (e.clientX - rect.left - this.offsetX) / this.zoom;
+        this.startY = (e.clientY - rect.top - this.offsetY) / this.zoom;
+    };
+
+    private mouseUpHandler = (e: MouseEvent) => {
+        if (this.isPanning) {
+            this.isPanning = false;
+            this.canvas.style.cursor = 'default';
+            return;
+        }
+
+        if (!this.clicked) return;
+
+        this.clicked = false;
+        const rect = this.canvas.getBoundingClientRect();
+        const endX = (e.clientX - rect.left - this.offsetX) / this.zoom;
+        const endY = (e.clientY - rect.top - this.offsetY) / this.zoom;
+        const width = endX - this.startX;
+        const height = endY - this.startY;
+
+        let shape: IShape | null = null;
+
+        if (this.selectedTool === "rect") {
+            shape = new Rectangle(this.startX, this.startY, width, height);
+        } else if (this.selectedTool === "circle") {
+            const radius = Math.max(width, height) / 2;
+            shape = new Circle(this.startX + radius, this.startY + radius, radius);
+        } else if (this.selectedTool === "pencil" && this.currentPencilPoints.length > 1) {
+            shape = new Pencil([...this.currentPencilPoints]);
+        }
+        this.currentPencilPoints = [];
+
+        if (shape) {
+            this.shapeManager.addShape(shape);
+            this.socketService.sendShape(shape);
+        }
+    };
+
+    private mouseMoveHandler = (e: MouseEvent) => {
+        if (this.isPanning) {
+            const deltaX = e.clientX - this.lastPanX;
+            const deltaY = e.clientY - this.lastPanY;
+            this.offsetX += deltaX;
+            this.offsetY += deltaY;
+            this.lastPanX = e.clientX;
+            this.lastPanY = e.clientY;
+            this.redrawCanvas();
+            return;
+        }
+
+        if (!this.clicked) return;
+
+        const rect = this.canvas.getBoundingClientRect();
+        const currX = (e.clientX - rect.left - this.offsetX) / this.zoom;
+        const currY = (e.clientY - rect.top - this.offsetY) / this.zoom;
+        const width = currX - this.startX;
+        const height = currY - this.startY;
+
+        this.redrawCanvas();
+        const ctx = this.canvas.getContext("2d")!;
+        ctx.save();
+        ctx.translate(this.offsetX, this.offsetY);
+        ctx.scale(this.zoom, this.zoom);
+        ctx.strokeStyle = "white";
+
+        if (this.selectedTool === "rect") {
+            const previewRect = new Rectangle(
+                this.startX,
+                this.startY,
+                width,
+                height
+            );
+            previewRect.draw(ctx);
+        } else if (this.selectedTool === "circle") {
+            const radius = Math.max(width, height) / 2;
+            const previewCircle = new Circle(
+                this.startX + radius,
+                this.startY + radius,
+                radius
+            );
+            previewCircle.draw(ctx);
+        } else if (this.selectedTool === "pencil") {
+            this.currentPencilPoints.push({ x: currX, y: currY });
+            const previewLine = new Pencil(this.currentPencilPoints);
+            previewLine.draw(ctx);
+        }
+        ctx.restore();
+    };
+
+    private initKeyboardHandlers() {
+        window.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                this.isSpacePressed = true;
+                this.canvas.style.cursor = 'grab';
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                this.isSpacePressed = false;
+                this.canvas.style.cursor = 'default';
             }
         });
     }
 
-    mouseDownHandler = (e: MouseEvent) => {
-        this.clicked = true;
-        const rect = this.canvas.getBoundingClientRect();
-        this.startX = e.clientX - rect.left;
-        this.startY = e.clientY - rect.top;
-    }
-
-    mouseUpHandler = (e: MouseEvent) => {
-        this.clicked = false;
-        const rect = this.canvas.getBoundingClientRect();
-        const endX = e.clientX - rect.left;
-        const endY = e.clientY - rect.top;
-        const width = endX - this.startX;
-        const height = endY - this.startY;
-
-        const selectedTool = this.selectedTool;
-        let shape: Shape | null = null;
-        if (selectedTool === "rect") {
-            shape = {
-                type: "rect",
-                x: this.startX,
-                y: this.startY,
-                width,
-                height,
-            }
-        } else if (selectedTool === "circle") {
-            const radius = Math.max(width, height) / 2;
-            shape = {
-                type: "circle",
-                radius: radius,
-                centerX: this.startX + radius,
-                centerY: this.startY + radius
-            }
-        }
-
-        if (!shape) {
-            return
-        }
-
-        this.existingShapes.push(shape);
-        console.log(shape)
-        this.socket.send(JSON.stringify({            //aici trimitem catre serverul din be, apoi serverul din be da broadcast la mesaj mai departe
-            type: "chat",
-            message: JSON.stringify(shape),
-            roomId: this.roomId
-        }))
-    }
-
-    mouseMoveHandler = (e: MouseEvent) => {
-        if (this.clicked) {
-            const rect = this.canvas.getBoundingClientRect();
-            const currX = e.clientX - rect.left;
-            const currY = e.clientY - rect.top;
-
-            const width = currX - this.startX;
-            const height = currY - this.startY;
-
-            this.clearCanvas();
-            this.ctx.strokeStyle = "white";
-            const selectedTool = this.selectedTool;
-            if (selectedTool === "rect") {
-                this.ctx.strokeRect(this.startX, this.startY, width, height);
-            } else if (selectedTool === "circle") {
-                const radius = Math.max(width, height) / 2;
-                const centerX = this.startX + radius;
-                const centerY = this.startY + radius;
-                this.ctx.beginPath();
-                this.ctx.arc(centerX, centerY, Math.abs(radius), 0, Math.PI * 2)
-                this.ctx.stroke()
-                this.ctx.closePath()
-
-            }
-        }
-    }
-
-    initMouseHandlers() {
-        // Când apeși mouse-ul, salvezi punctul de start
-        this.canvas.addEventListener("mousedown", this.mouseDownHandler)
-
-        // Când dai drumul la mouse, finalizezi forma și o trimiți prin WebSocket
-        this.canvas.addEventListener("mouseup", this.mouseUpHandler)
-
-        // Cât timp mouse-ul e apăsat, arăt preview-ul formei
+    private initMouseHandlers() {
+        this.canvas.addEventListener("mousedown", this.mouseDownHandler);
+        this.canvas.addEventListener("mouseup", this.mouseUpHandler);
         this.canvas.addEventListener("mousemove", this.mouseMoveHandler);
+        this.canvas.addEventListener("wheel", this.wheelHandler);
+        // Prevent context menu on right click
+        this.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
+    }
+
+    destroy() {
+        this.canvas.removeEventListener("mousedown", this.mouseDownHandler);
+        this.canvas.removeEventListener("mouseup", this.mouseUpHandler);
+        this.canvas.removeEventListener("mousemove", this.mouseMoveHandler);
+        this.canvas.removeEventListener("wheel", this.wheelHandler);
+        this.canvas.removeEventListener("contextmenu", (e) => e.preventDefault());
+        window.removeEventListener('keydown', this.initKeyboardHandlers);
+        window.removeEventListener('keyup', this.initKeyboardHandlers);
     }
 }

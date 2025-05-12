@@ -1,11 +1,9 @@
-// Renders the canvas
-
-import { initDraw } from "@/draw";
 import { useEffect, useRef, useState } from "react";
 import { IconButton } from "./IconButton";
 import { PiPencil } from "react-icons/pi";
 import { BiCircle, BiRectangle } from "react-icons/bi";
 import { Game } from "@/draw/Game";
+import { IoMdAdd, IoMdRemove, IoMdRefresh } from "react-icons/io";
 
 export type Tool = "circle" | "rect" | "pencil"
 
@@ -18,7 +16,23 @@ export function Canvas({
 }) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [game, setGame] = useState<Game>()
-    const [selectedTool, setSelectedTool] = useState<Tool>("circle");
+    const [selectedTool, setSelectedTool] = useState<Tool>("circle")
+
+    useEffect(() => {
+        const handleResize = () => {
+            if (canvasRef.current) {
+                canvasRef.current.width = window.innerWidth
+                canvasRef.current.height = window.innerHeight
+                game?.redrawCanvas()
+            }
+        }
+
+        window.addEventListener('resize', handleResize)
+
+        return () => {
+            window.removeEventListener('resize', handleResize)
+        }
+    }, [game])
 
     useEffect(() => {
         game?.setTool(selectedTool)
@@ -27,7 +41,7 @@ export function Canvas({
     useEffect(() => {
         if (canvasRef.current) {
             const g = new Game(canvasRef.current, roomId, socket)
-            setGame(g);
+            setGame(g)
 
             return (() => {
                 g.destroy()
@@ -35,30 +49,64 @@ export function Canvas({
         }
     }, [canvasRef])
 
-    return <div className="h-screen bg-red-200 overflow-hidden">
-        <TopBar selectedTool={selectedTool} setSelectedTool={setSelectedTool} />
-        <canvas ref={canvasRef} width={window.innerWidth} height={window.innerHeight}></canvas>
-    </div>
+    return (
+        <div className="h-screen overflow-hidden bg-black">
+            <TopBar
+                selectedTool={selectedTool}
+                setSelectedTool={setSelectedTool}
+                game={game}
+            />
+            <canvas
+                ref={canvasRef}
+                width={window.innerWidth}
+                height={window.innerHeight}
+                className="absolute top-0 left-0 w-full h-full"
+            ></canvas>
+        </div>
+    )
 }
 
-function TopBar({ selectedTool, setSelectedTool }: {
+function TopBar({
+    selectedTool,
+    setSelectedTool,
+    game
+}: {
     selectedTool: Tool,
-    setSelectedTool: (s: Tool) => void
+    setSelectedTool: (s: Tool) => void,
+    game?: Game
 }) {
-    return <div className="fixed top-10 left-10 ">
-        <div className="flex gap-2">
-            <IconButton
-                activated={selectedTool === "pencil"}
-                icon={<PiPencil />}
-                onClick={() => { setSelectedTool("pencil") }} />
-            <IconButton
-                activated={selectedTool === "rect"}
-                icon={<BiRectangle />}
-                onClick={() => { setSelectedTool("rect") }} />
-            <IconButton
-                activated={selectedTool === "circle"}
-                icon={<BiCircle />}
-                onClick={() => { setSelectedTool("circle") }} />
+    return (
+        <div className="fixed top-10 left-10 z-10">
+            <div className="flex gap-2">
+                <div className="flex gap-2 bg-white/10 p-2 rounded-lg">
+                    <IconButton
+                        activated={selectedTool === "pencil"}
+                        icon={<PiPencil />}
+                        onClick={() => { setSelectedTool("pencil") }} />
+                    <IconButton
+                        activated={selectedTool === "rect"}
+                        icon={<BiRectangle />}
+                        onClick={() => { setSelectedTool("rect") }} />
+                    <IconButton
+                        activated={selectedTool === "circle"}
+                        icon={<BiCircle />}
+                        onClick={() => { setSelectedTool("circle") }} />
+                </div>
+                <div className="flex gap-2 bg-white/10 p-2 rounded-lg">
+                    <IconButton
+                        activated={false}
+                        icon={<IoMdAdd />}
+                        onClick={() => { game?.zoomIn() }} />
+                    <IconButton
+                        activated={false}
+                        icon={<IoMdRemove />}
+                        onClick={() => { game?.zoomOut() }} />
+                    <IconButton
+                        activated={false}
+                        icon={<IoMdRefresh />}
+                        onClick={() => { game?.resetZoom() }} />
+                </div>
+            </div>
         </div>
-    </div>
+    )
 }
