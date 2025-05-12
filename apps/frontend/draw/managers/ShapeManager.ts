@@ -3,6 +3,7 @@ import { Rectangle } from "../shapes/Rectangle";
 import { IShape } from "../shapes/IShape";
 import { getExistingShapes } from "../services/ExistingShapes";
 import { Pencil } from "../shapes/Pencil";
+import { Line } from "../shapes/Line";
 
 export class ShapeManager {
     private shapes: IShape[] = [];
@@ -37,8 +38,17 @@ export class ShapeManager {
                     );
                 } else if (shapeData.type === "pencil") {
                     return new Pencil(shapeData.points);
+                } else if (shapeData.type === "line") {
+                    // Verificăm dacă avem puncte
+                    if (shapeData.points && shapeData.points.length > 0) {
+                        const line = new Line(shapeData.points[0].x, shapeData.points[0].y);
+                        shapeData.points.slice(1).forEach((point: { x: number; y: number }) => {
+                            line.addPoint(point.x, point.y);
+                        });
+                        return line;
+                    }
+                    return null;
                 }
-                return null;
             }).filter((shape: IShape | null): shape is IShape => shape !== null);
 
             this.initialized = true;
@@ -50,13 +60,17 @@ export class ShapeManager {
     }
 
     addShape(shape: IShape) {
-        this.shapes.push(shape);
+        if (shape !== null && shape !== undefined) {
+            this.shapes.push(shape);
+        }
     }
 
     drawAll(ctx: CanvasRenderingContext2D) {
-        this.shapes.forEach(shape => {
-            shape.draw(ctx);
-        });
+        this.shapes
+            .filter((shape): shape is IShape => shape !== null && shape !== undefined)
+            .forEach(shape => {
+                shape.draw(ctx);
+            });
     }
 
     clearAndDraw(ctx: CanvasRenderingContext2D, width: number, height: number) {

@@ -2,6 +2,8 @@ import { IShape } from "../shapes/IShape";
 import { Circle } from "../shapes/Circle";
 import { Rectangle } from "../shapes/Rectangle";
 import { Pencil } from "../shapes/Pencil";
+import { Rhombus } from "../shapes/Rhombus";
+import { Line } from "../shapes/Line";
 
 export class SocketService {
     constructor(private socket: WebSocket, private roomId: string) { }
@@ -28,6 +30,16 @@ export class SocketService {
                     shape = new Rectangle(shapeData.x, shapeData.y, shapeData.width, shapeData.height);
                 } else if (shapeData.type === "pencil") {
                     shape = new Pencil(shapeData.points)
+                } else if (shapeData.type === "romb") {
+                    shape = new Rhombus(shapeData.x, shapeData.y, shapeData.width, shapeData.height);
+                } else if (shapeData.type === "line") {
+                    if (shapeData.points && shapeData.points.length > 0) {
+                        const line = new Line(shapeData.points[0].x, shapeData.points[0].y);
+                        shapeData.points.slice(1).forEach((point: { x: number; y: number }) => {
+                            line.addPoint(point.x, point.y);
+                        });
+                        shape = line;
+                    }
                 }
 
                 if (shape) {

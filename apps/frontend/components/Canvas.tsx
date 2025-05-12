@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { IconButton } from "./IconButton";
 import { PiPencil } from "react-icons/pi";
-import { BiCircle, BiRectangle } from "react-icons/bi";
+import { BiCircle, BiLineChart, BiRectangle } from "react-icons/bi";
 import { Game } from "@/draw/Game";
 import { IoMdAdd, IoMdRemove, IoMdRefresh, IoMdRedo, IoMdUndo } from "react-icons/io";
 import { IoHandRightOutline } from "react-icons/io5";
 import { CgShapeRhombus } from "react-icons/cg";
+import { RiTimeLine } from "react-icons/ri";
+import { TbLine } from "react-icons/tb";
 
-export type Tool = "circle" | "rect" | "pencil" | "hand" | "romb"
+export type Tool = "circle" | "rect" | "pencil" | "hand" | "romb" | "line"
 
 export function Canvas({
     roomId,
@@ -101,6 +103,10 @@ function TopBar({
                         activated={selectedTool === "romb"}
                         icon={<CgShapeRhombus />}
                         onClick={() => { setSelectedTool("romb") }} />
+                    <IconButton
+                        activated={selectedTool === "line"}
+                        icon={<TbLine />}
+                        onClick={() => { setSelectedTool("line") }} />
                 </div>
                 <div className="flex gap-2 bg-white/10 p-2 rounded-lg">
                     <IconButton

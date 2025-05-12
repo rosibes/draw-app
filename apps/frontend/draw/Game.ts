@@ -6,6 +6,7 @@ import { Tool } from "@/components/Canvas";
 import { IShape } from "./shapes/IShape";
 import { Pencil } from "./shapes/Pencil";
 import { Rhombus } from "./shapes/Rhombus";
+import { Line } from "./shapes/Line";
 
 export class Game {
     private shapeManager = new ShapeManager();
@@ -24,6 +25,8 @@ export class Game {
     private isSpacePressed = false;
     private undoStack: IShape[][] = [];
     private redoStack: IShape[][] = [];
+    private currentPolyline: Line | null = null;
+
 
     constructor(
         private canvas: HTMLCanvasElement,
@@ -68,6 +71,13 @@ export class Game {
     }
 
     setTool(tool: Tool) {
+        if (this.selectedTool === "line" && this.currentPolyline) {
+            // Finalizăm linia când schimbăm tool-ul
+            this.addToHistory();  // Adaugă această linie
+            this.shapeManager.addShape(this.currentPolyline);
+            this.socketService.sendShape(this.currentPolyline);
+            this.currentPolyline = null;
+        }
         this.selectedTool = tool;
         // Update cursor based on selected tool
         if (tool === "hand") {
@@ -177,6 +187,20 @@ export class Game {
     };
 
     private mouseDownHandler = (e: MouseEvent) => {
+        if (this.selectedTool === "line") {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left - this.offsetX) / this.zoom;
+            const y = (e.clientY - rect.top - this.offsetY) / this.zoom;
+
+            if (!this.currentPolyline) {
+                // Începem o nouă linie
+                this.currentPolyline = new Line(x, y);
+            } else {
+                // Adăugăm un nou punct
+                this.currentPolyline.addPoint(x, y);
+            }
+            return;
+        }
         // Start panning on right click, space + left click, or hand tool
         if (e.button === 2 || (e.button === 0 && (this.isSpacePressed || this.selectedTool === "hand"))) {
             this.isPanning = true;
@@ -231,6 +255,33 @@ export class Game {
     };
 
     private mouseMoveHandler = (e: MouseEvent) => {
+        if (this.selectedTool === "line" && this.currentPolyline) {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left - this.offsetX) / this.zoom;
+            const y = (e.clientY - rect.top - this.offsetY) / this.zoom;
+
+            // Desenăm preview-ul
+            this.redrawCanvas();
+            const ctx = this.canvas.getContext("2d")!;
+            ctx.save();
+            ctx.translate(this.offsetX, this.offsetY);
+            ctx.scale(this.zoom, this.zoom);
+
+            // Desenăm linia curentă
+            this.currentPolyline.draw(ctx);
+
+            // Desenăm linia de la ultimul punct la mouse
+            if (this.currentPolyline.points.length > 0) {
+                const lastPoint = this.currentPolyline.points[this.currentPolyline.points.length - 1];
+                ctx.beginPath();
+                ctx.moveTo(lastPoint.x, lastPoint.y);
+                ctx.lineTo(x, y);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+            return;
+        }
         if (this.isPanning) {
             const deltaX = e.clientX - this.lastPanX;
             const deltaY = e.clientY - this.lastPanY;
