@@ -26,15 +26,22 @@ export class Game {
     private undoStack: IShape[][] = [];
     private redoStack: IShape[][] = [];
     private currentPolyline: Line | null = null;
-
+    private selectedShape: IShape | null = null;
+    private isDragging = false;
+    private dragStartX = 0;
+    private dragStartY = 0;
+    private selectedHandleIndex: number = -1;
+    private onToolChange: ((tool: Tool) => void) | null = null;
 
     constructor(
         private canvas: HTMLCanvasElement,
         private roomId: string,
-        socket: WebSocket
+        socket: WebSocket,
+        onToolChange?: (tool: Tool) => void
     ) {
         const ctx = canvas.getContext("2d")!;
         this.socketService = new SocketService(socket, roomId);
+        this.onToolChange = onToolChange || null;
         this.initialize(ctx);
         this.initHandlers();
         this.initMouseHandlers();
@@ -59,14 +66,19 @@ export class Game {
 
     public redrawCanvas() {
         const ctx = this.canvas.getContext("2d")!;
-        ctx.save();                                                   // Salvăm starea curentă
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);  // Ștergem tot
+        ctx.save();
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.translate(this.offsetX, this.offsetY);
+        ctx.scale(this.zoom, this.zoom);
 
-        // Apply zoom and pan transformations
-        ctx.translate(this.offsetX, this.offsetY);                  // 1. Mai întâi mutăm (pan)
-        ctx.scale(this.zoom, this.zoom);                            // 2. Apoi mărim/micșorăm (zoom)
-
+        // Desenăm toate formele salvate
         this.shapeManager.clearAndDraw(ctx, this.canvas.width / this.zoom, this.canvas.height / this.zoom);
+
+        // Dacă avem o linie în desen, o desenăm și pe ea
+        if (this.selectedTool === "line" && this.currentPolyline) {
+            this.currentPolyline.draw(ctx);
+        }
+
         ctx.restore();
     }
 
@@ -84,6 +96,10 @@ export class Game {
             this.canvas.style.cursor = 'grab';
         } else {
             this.canvas.style.cursor = 'default';
+        }
+        // Notify toolbar about tool change
+        if (this.onToolChange) {
+            this.onToolChange(tool);
         }
     }
 
@@ -187,6 +203,62 @@ export class Game {
     };
 
     private mouseDownHandler = (e: MouseEvent) => {
+        // Start panning on right click, space + left click, or hand tool
+        if (e.button === 2 || (e.button === 0 && (this.isSpacePressed || this.selectedTool === "hand"))) {
+            this.isPanning = true;
+            this.lastPanX = e.clientX;
+            this.lastPanY = e.clientY;
+            this.canvas.style.cursor = 'grabbing';
+            return;
+        }
+
+        if (this.selectedTool === "select") {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left - this.offsetX) / this.zoom;
+            const y = (e.clientY - rect.top - this.offsetY) / this.zoom;
+
+            // Verificăm dacă am dat click pe un handle
+            if (this.selectedShape) {
+                const handles = this.selectedShape.getHandles();
+                const handleIndex = handles.findIndex(handle =>
+                    Math.abs(handle.x - x) < 5 && Math.abs(handle.y - y) < 5
+                );
+
+                if (handleIndex !== -1) {
+                    this.isDragging = true;
+                    this.dragStartX = x;
+                    this.dragStartY = y;
+                    this.selectedHandleIndex = handleIndex;
+                    return;
+                }
+            }
+
+            // Verificăm dacă am dat click pe o formă
+            const clickedShape = this.shapeManager.getShapes().find(shape =>
+                shape.containsPoint(x, y)
+            );
+
+            // Deselectăm forma anterioară
+            if (this.selectedShape) {
+                this.selectedShape.isSelected = false;
+            }
+
+            // Selectăm noua formă
+            if (clickedShape) {
+                clickedShape.isSelected = true;
+                this.selectedShape = clickedShape;
+                this.isDragging = true;
+                this.dragStartX = x;
+                this.dragStartY = y;
+                this.selectedHandleIndex = -1; // Nu e handle
+            } else {
+                this.selectedShape = null;
+            }
+
+            this.redrawCanvas();
+            return;
+        }
+
         if (this.selectedTool === "line") {
             const rect = this.canvas.getBoundingClientRect();
             const x = (e.clientX - rect.left - this.offsetX) / this.zoom;
@@ -201,14 +273,6 @@ export class Game {
             }
             return;
         }
-        // Start panning on right click, space + left click, or hand tool
-        if (e.button === 2 || (e.button === 0 && (this.isSpacePressed || this.selectedTool === "hand"))) {
-            this.isPanning = true;
-            this.lastPanX = e.clientX;
-            this.lastPanY = e.clientY;
-            this.canvas.style.cursor = 'grabbing';
-            return;
-        }
 
         // Normal drawing behavior
         this.clicked = true;
@@ -218,6 +282,12 @@ export class Game {
     };
 
     private mouseUpHandler = (e: MouseEvent) => {
+        if (this.isDragging) {
+            this.isDragging = false;
+            // Salvăm starea pentru undo/redo
+            this.addToHistory();
+            return;
+        }
         if (this.isPanning) {
             this.isPanning = false;
             this.canvas.style.cursor = 'default';
@@ -255,6 +325,99 @@ export class Game {
     };
 
     private mouseMoveHandler = (e: MouseEvent) => {
+        if (this.selectedTool === "select" && this.isDragging && this.selectedShape) {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left - this.offsetX) / this.zoom;
+            const y = (e.clientY - rect.top - this.offsetY) / this.zoom;
+
+            // Calculăm diferența
+            const dx = x - this.dragStartX;
+            const dy = y - this.dragStartY;
+
+            if (this.selectedHandleIndex !== -1) {
+                // Modificăm forma în funcție de handle-ul selectat
+                if (this.selectedShape instanceof Rectangle) {
+                    switch (this.selectedHandleIndex) {
+                        case 0: // Top-left
+                            this.selectedShape.x += dx;
+                            this.selectedShape.y += dy;
+                            this.selectedShape.width -= dx;
+                            this.selectedShape.height -= dy;
+                            break;
+                        case 1: // Top-right
+                            this.selectedShape.y += dy;
+                            this.selectedShape.width += dx;
+                            this.selectedShape.height -= dy;
+                            break;
+                        case 2: // Bottom-right
+                            this.selectedShape.width += dx;
+                            this.selectedShape.height += dy;
+                            break;
+                        case 3: // Bottom-left
+                            this.selectedShape.x += dx;
+                            this.selectedShape.width -= dx;
+                            this.selectedShape.height += dy;
+                            break;
+                    }
+                } else if (this.selectedShape instanceof Circle) {
+                    if (this.selectedHandleIndex === 4) { // Center handle
+                        this.selectedShape.centerX += dx;
+                        this.selectedShape.centerY += dy;
+                    } else {
+                        // Calculăm raza bazată pe distanța de la centru la mouse
+                        const dx = x - this.selectedShape.centerX;
+                        const dy = y - this.selectedShape.centerY;
+                        this.selectedShape.radius = Math.sqrt(dx * dx + dy * dy);
+                    }
+                } else if (this.selectedShape instanceof Rhombus) {
+                    switch (this.selectedHandleIndex) {
+                        case 0: // Top
+                            this.selectedShape.height = Math.max(10, this.selectedShape.height - dy);
+                            break;
+                        case 1: // Right
+                            this.selectedShape.width = Math.max(10, this.selectedShape.width + dx);
+                            break;
+                        case 2: // Bottom
+                            this.selectedShape.height = Math.max(10, this.selectedShape.height + dy);
+                            break;
+                        case 3: // Left
+                            this.selectedShape.width = Math.max(10, this.selectedShape.width - dx);
+                            break;
+                    }
+                } else if (this.selectedShape instanceof Pencil || this.selectedShape instanceof Line) {
+                    // Modificăm punctul individual
+                    this.selectedShape.points[this.selectedHandleIndex].x = x;
+                    this.selectedShape.points[this.selectedHandleIndex].y = y;
+                }
+            } else {
+                // Mutăm forma în funcție de tipul ei
+                if (this.selectedShape instanceof Rectangle) {
+                    this.selectedShape.x += dx;
+                    this.selectedShape.y += dy;
+                } else if (this.selectedShape instanceof Circle) {
+                    this.selectedShape.centerX += dx;
+                    this.selectedShape.centerY += dy;
+                } else if (this.selectedShape instanceof Line) {
+                    this.selectedShape.points.forEach(point => {
+                        point.x += dx;
+                        point.y += dy;
+                    });
+                } else if (this.selectedShape instanceof Rhombus) {
+                    this.selectedShape.x += dx;
+                    this.selectedShape.y += dy;
+                } else if (this.selectedShape instanceof Pencil) {
+                    this.selectedShape.points.forEach(point => {
+                        point.x += dx;
+                        point.y += dy;
+                    });
+                }
+            }
+
+            this.dragStartX = x;
+            this.dragStartY = y;
+            this.redrawCanvas();
+            return;
+        }
         if (this.selectedTool === "line" && this.currentPolyline) {
             const rect = this.canvas.getBoundingClientRect();
             const x = (e.clientX - rect.left - this.offsetX) / this.zoom;
@@ -348,6 +511,31 @@ export class Game {
                 } else {
                     this.undo();
                 }
+            }
+
+            // Shortcuts pentru tool-uri
+            switch (e.key) {
+                case '1':
+                    this.setTool('hand');
+                    break;
+                case '2':
+                    this.setTool('select');
+                    break;
+                case '3':
+                    this.setTool('rect');
+                    break;
+                case '4':
+                    this.setTool('romb');
+                    break;
+                case '5':
+                    this.setTool('circle');
+                    break;
+                case '6':
+                    this.setTool('line');
+                    break;
+                case '7':
+                    this.setTool('pencil');
+                    break;
             }
         });
 

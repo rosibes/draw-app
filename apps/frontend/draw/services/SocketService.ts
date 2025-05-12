@@ -29,7 +29,7 @@ export class SocketService {
                 } else if (shapeData.type === "rect") {
                     shape = new Rectangle(shapeData.x, shapeData.y, shapeData.width, shapeData.height);
                 } else if (shapeData.type === "pencil") {
-                    shape = new Pencil(shapeData.points)
+                    shape = new Pencil(shapeData.points);
                 } else if (shapeData.type === "romb") {
                     shape = new Rhombus(shapeData.x, shapeData.y, shapeData.width, shapeData.height);
                 } else if (shapeData.type === "line") {

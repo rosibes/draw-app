@@ -4,6 +4,7 @@ import { IShape } from "../shapes/IShape";
 import { getExistingShapes } from "../services/ExistingShapes";
 import { Pencil } from "../shapes/Pencil";
 import { Line } from "../shapes/Line";
+import { Rhombus } from "../shapes/Rhombus";
 
 export class ShapeManager {
     private shapes: IShape[] = [];
@@ -16,7 +17,6 @@ export class ShapeManager {
     setShapes(shapes: IShape[]) {
         this.shapes = [...shapes];  // Facem o copie pentru siguranță
     }
-
 
     async loadInitialShapes(roomId: string): Promise<boolean> {
         try {
@@ -48,7 +48,15 @@ export class ShapeManager {
                         return line;
                     }
                     return null;
+                } else if (shapeData.type === "romb") {
+                    return new Rhombus(
+                        shapeData.x,
+                        shapeData.y,
+                        shapeData.width,
+                        shapeData.height
+                    );
                 }
+                return null;
             }).filter((shape: IShape | null): shape is IShape => shape !== null);
 
             this.initialized = true;
@@ -60,17 +68,13 @@ export class ShapeManager {
     }
 
     addShape(shape: IShape) {
-        if (shape !== null && shape !== undefined) {
-            this.shapes.push(shape);
-        }
+        this.shapes.push(shape);
     }
 
     drawAll(ctx: CanvasRenderingContext2D) {
-        this.shapes
-            .filter((shape): shape is IShape => shape !== null && shape !== undefined)
-            .forEach(shape => {
-                shape.draw(ctx);
-            });
+        this.shapes.forEach(shape => {
+            shape.draw(ctx);
+        });
     }
 
     clearAndDraw(ctx: CanvasRenderingContext2D, width: number, height: number) {

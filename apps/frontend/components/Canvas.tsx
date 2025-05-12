@@ -1,15 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { IconButton } from "./IconButton";
-import { PiPencil } from "react-icons/pi";
-import { BiCircle, BiLineChart, BiRectangle } from "react-icons/bi";
 import { Game } from "@/draw/Game";
-import { IoMdAdd, IoMdRemove, IoMdRefresh, IoMdRedo, IoMdUndo } from "react-icons/io";
-import { IoHandRightOutline } from "react-icons/io5";
-import { CgShapeRhombus } from "react-icons/cg";
-import { RiTimeLine } from "react-icons/ri";
-import { TbLine } from "react-icons/tb";
+import { TopBar } from "./TopBar";
 
-export type Tool = "circle" | "rect" | "pencil" | "hand" | "romb" | "line"
+export type Tool = "circle" | "rect" | "pencil" | "hand" | "romb" | "line" | "select"
 
 export function Canvas({
     roomId,
@@ -37,6 +30,39 @@ export function Canvas({
             window.removeEventListener('resize', handleResize)
         }
     }, [game])
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            switch (e.key) {
+                case '1':
+                    setSelectedTool('hand');
+                    break;
+                case '2':
+                    setSelectedTool('select');
+                    break;
+                case '3':
+                    setSelectedTool('rect');
+                    break;
+                case '4':
+                    setSelectedTool('romb');
+                    break;
+                case '5':
+                    setSelectedTool('circle');
+                    break;
+                case '6':
+                    setSelectedTool('line');
+                    break;
+                case '7':
+                    setSelectedTool('pencil');
+                    break;
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown);
+        };
+    }, []);
 
     useEffect(() => {
         game?.setTool(selectedTool)
@@ -70,69 +96,3 @@ export function Canvas({
     )
 }
 
-function TopBar({
-    selectedTool,
-    setSelectedTool,
-    game
-}: {
-    selectedTool: Tool,
-    setSelectedTool: (s: Tool) => void,
-    game?: Game
-}) {
-    return (
-        <div className="fixed top-10 left-10 z-10">
-            <div className="flex gap-2">
-                <div className="flex gap-2 bg-white/10 p-2 rounded-lg">
-                    <IconButton
-                        activated={selectedTool === "hand"}
-                        icon={<IoHandRightOutline />}
-                        onClick={() => { setSelectedTool("hand") }} />
-                    <IconButton
-                        activated={selectedTool === "pencil"}
-                        icon={<PiPencil />}
-                        onClick={() => { setSelectedTool("pencil") }} />
-                    <IconButton
-                        activated={selectedTool === "rect"}
-                        icon={<BiRectangle />}
-                        onClick={() => { setSelectedTool("rect") }} />
-                    <IconButton
-                        activated={selectedTool === "circle"}
-                        icon={<BiCircle />}
-                        onClick={() => { setSelectedTool("circle") }} />
-                    <IconButton
-                        activated={selectedTool === "romb"}
-                        icon={<CgShapeRhombus />}
-                        onClick={() => { setSelectedTool("romb") }} />
-                    <IconButton
-                        activated={selectedTool === "line"}
-                        icon={<TbLine />}
-                        onClick={() => { setSelectedTool("line") }} />
-                </div>
-                <div className="flex gap-2 bg-white/10 p-2 rounded-lg">
-                    <IconButton
-                        activated={false}
-                        icon={<IoMdAdd />}
-                        onClick={() => { game?.zoomIn() }} />
-                    <IconButton
-                        activated={false}
-                        icon={<IoMdRemove />}
-                        onClick={() => { game?.zoomOut() }} />
-                    <IconButton
-                        activated={false}
-                        icon={<IoMdRefresh />}
-                        onClick={() => { game?.resetZoom() }} />
-                </div>
-                <div className="flex gap-2 bg-white/10 p-2 rounded-lg">
-                    <IconButton
-                        activated={false}
-                        icon={<IoMdUndo />}
-                        onClick={() => { game?.undo() }} />
-                    <IconButton
-                        activated={false}
-                        icon={<IoMdRedo />}
-                        onClick={() => { game?.redo() }} />
-                </div>
-            </div>
-        </div>
-    )
-}
