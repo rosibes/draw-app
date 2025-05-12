@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="800" height="600" viewBox="0 0 800 600" xmlns="http://www.w3.org/2000/svg">
+    <!-- Grid Background -->
+    <defs>
+        <pattern id="smallGrid" width="10" height="10" patternUnits="userSpaceOnUse">
+            <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#ccc" stroke-width="0.5"/>
+        </pattern>
+        <pattern id="grid" width="100" height="100" patternUnits="userSpaceOnUse">
+            <rect width="100" height="100" fill="url(#smallGrid)"/>
+            <path d="M 100 0 L 0 0 0 100" fill="none" stroke="#999" stroke-width="1"/>
+        </pattern>
+    </defs>
+    <rect width="100%" height="100%" fill="url(#grid)" />
+
+    <!-- Original Canvas -->
+    <g transform="translate(50,50)">
+        <rect x="0" y="0" width="200" height="150" fill="none" stroke="#000" stroke-width="2"/>
+        <text x="70" y="85" font-family="Arial" font-size="14">Original Canvas</text>
+        <circle cx="100" cy="75" r="20" fill="blue" opacity="0.5"/>
+    </g>
+
+    <!-- Zoom Transform -->
+    <g transform="translate(300,50)">
+        <rect x="0" y="0" width="200" height="150" fill="none" stroke="#000" stroke-width="2"/>
+        <text x="60" y="85" font-family="Arial" font-size="14">Zoom (scale)</text>
+        <circle cx="100" cy="75" r="40" fill="blue" opacity="0.5"/>
+        <!-- Zoom Formula -->
+        <text x="20" y="180" font-family="monospace" font-size="12">ctx.scale(zoom, zoom)</text>
+    </g>
+
+    <!-- Pan Transform -->
+    <g transform="translate(550,50)">
+        <rect x="0" y="0" width="200" height="150" fill="none" stroke="#000" stroke-width="2"/>
+        <text x="60" y="85" font-family="Arial" font-size="14">Pan (translate)</text>
+        <circle cx="150" cy="100" r="40" fill="blue" opacity="0.5"/>
+        <!-- Pan Formula -->
+        <text x="20" y="180" font-family="monospace" font-size="12">ctx.translate(offsetX, offsetY)</text>
+    </g>
+
+    <!-- Mouse Position Calculation -->
+    <g transform="translate(50,300)">
+        <rect x="0" y="0" width="300" height="200" fill="none" stroke="#000" stroke-width="2"/>
+        <text x="20" y="30" font-family="Arial" font-size="14">Mouse Position Calculation:</text>
+        <text x="20" y="60" font-family="monospace" font-size="12">canvasX = (mouseX - offsetX) / zoom</text>
+        <text x="20" y="80" font-family="monospace" font-size="12">canvasY = (mouseY - offsetY) / zoom</text>
+        
+        <text x="20" y="120" font-family="Arial" font-size="14">Zoom at cursor:</text>
+        <text x="20" y="150" font-family="monospace" font-size="12">newOffsetX = mouseX - canvasX * newZoom</text>
+        <text x="20" y="170" font-family="monospace" font-size="12">newOffsetY = mouseY - canvasY * newZoom</text>
+    </g>
+
+    <!-- Pan Delta Calculation -->
+    <g transform="translate(400,300)">
+        <rect x="0" y="0" width="300" height="200" fill="none" stroke="#000" stroke-width="2"/>
+        <text x="20" y="30" font-family="Arial" font-size="14">Pan Delta Calculation:</text>
+        <text x="20" y="60" font-family="monospace" font-size="12">deltaX = currentX - lastX</text>
+        <text x="20" y="80" font-family="monospace" font-size="12">deltaY = currentY - lastY</text>
+        
+        <text x="20" y="120" font-family="Arial" font-size="14">Update offset:</text>
+        <text x="20" y="150" font-family="monospace" font-size="12">offsetX += deltaX</text>
+        <text x="20" y="170" font-family="monospace" font-size="12">offsetY += deltaY</text>
+    </g>
+
+    <!-- Arrows connecting concepts -->
+    <g stroke="#666" stroke-width="2" fill="none" marker-end="url(#arrowhead)">
+        <defs>
+            <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#666"/>
+            </marker>
+        </defs>
+        <path d="M 250,125 L 290,125"/>
+        <path d="M 500,125 L 540,125"/>
+    </g>
+</svg> 

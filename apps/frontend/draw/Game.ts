@@ -53,12 +53,12 @@ export class Game {
 
     public redrawCanvas() {
         const ctx = this.canvas.getContext("2d")!;
-        ctx.save();
-        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        ctx.save();                                                   // Salvăm starea curentă
+        ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);  // Ștergem tot
 
         // Apply zoom and pan transformations
-        ctx.translate(this.offsetX, this.offsetY);
-        ctx.scale(this.zoom, this.zoom);
+        ctx.translate(this.offsetX, this.offsetY);                  // 1. Mai întâi mutăm (pan)
+        ctx.scale(this.zoom, this.zoom);                            // 2. Apoi mărim/micșorăm (zoom)
 
         this.shapeManager.clearAndDraw(ctx, this.canvas.width / this.zoom, this.canvas.height / this.zoom);
         ctx.restore();
@@ -87,28 +87,42 @@ export class Game {
     };
 
     public zoomIn() {
-        // Zoom in from center when using buttons
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2;
+        // 1. Găsim centrul canvas-ului
+        const centerX = this.canvas.width / 2;    // jumătatea lățimii canvas-ului
+        const centerY = this.canvas.height / 2;   // jumătatea înălțimii canvas-ului
+
+        // 2. Convertim centrul în coordonate canvas (ținând cont de zoom și offset)
         const canvasX = (centerX - this.offsetX) / this.zoom;
         const canvasY = (centerY - this.offsetY) / this.zoom;
 
+        // 3. Mărim zoom-ul
         this.zoom = Math.min(this.zoom * 1.1, 5);
+
+        // 4. Recalculăm offset-ul pentru a păstra centrul fix
         this.offsetX = centerX - canvasX * this.zoom;
         this.offsetY = centerY - canvasY * this.zoom;
+
+        // 5. Redesenăm canvas-ul
         this.redrawCanvas();
     }
 
     public zoomOut() {
-        // Zoom out from center when using buttons
-        const centerX = this.canvas.width / 2;
-        const centerY = this.canvas.height / 2;
+        // 1. Găsim centrul canvas-ului
+        const centerX = this.canvas.width / 2;    // ex: 1000/2 = 500
+        const centerY = this.canvas.height / 2;   // ex: 800/2 = 400
+
+        // 2. Convertim centrul în coordonate canvas
         const canvasX = (centerX - this.offsetX) / this.zoom;
         const canvasY = (centerY - this.offsetY) / this.zoom;
 
+        // 3. Micșorăm zoom-ul
         this.zoom = Math.max(this.zoom / 1.1, 0.2);
+
+        // 4. Recalculăm offset-ul
         this.offsetX = centerX - canvasX * this.zoom;
         this.offsetY = centerY - canvasY * this.zoom;
+
+        // 5. Redesenăm canvas-ul
         this.redrawCanvas();
     }
 
@@ -121,11 +135,17 @@ export class Game {
 
     setTool(tool: Tool) {
         this.selectedTool = tool;
+        // Update cursor based on selected tool
+        if (tool === "hand") {
+            this.canvas.style.cursor = 'grab';
+        } else {
+            this.canvas.style.cursor = 'default';
+        }
     }
 
     private mouseDownHandler = (e: MouseEvent) => {
-        // Start panning on right click or space + left click
-        if (e.button === 2 || (e.button === 0 && this.isSpacePressed)) {
+        // Start panning on right click, space + left click, or hand tool
+        if (e.button === 2 || (e.button === 0 && (this.isSpacePressed || this.selectedTool === "hand"))) {
             this.isPanning = true;
             this.lastPanX = e.clientX;
             this.lastPanY = e.clientY;

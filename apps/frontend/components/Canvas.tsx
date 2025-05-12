@@ -4,8 +4,10 @@ import { PiPencil } from "react-icons/pi";
 import { BiCircle, BiRectangle } from "react-icons/bi";
 import { Game } from "@/draw/Game";
 import { IoMdAdd, IoMdRemove, IoMdRefresh } from "react-icons/io";
+import { BsHandIndex, BsHandIndexThumb } from "react-icons/bs";
+import { IoHandRightOutline } from "react-icons/io5";
 
-export type Tool = "circle" | "rect" | "pencil"
+export type Tool = "circle" | "rect" | "pencil" | "hand"
 
 export function Canvas({
     roomId,
@@ -79,6 +81,10 @@ function TopBar({
         <div className="fixed top-10 left-10 z-10">
             <div className="flex gap-2">
                 <div className="flex gap-2 bg-white/10 p-2 rounded-lg">
+                    <IconButton
+                        activated={selectedTool === "hand"}
+                        icon={<IoHandRightOutline />}
+                        onClick={() => { setSelectedTool("hand") }} />
                     <IconButton
                         activated={selectedTool === "pencil"}
                         icon={<PiPencil />}
