@@ -5,11 +5,12 @@ import { Rectangle } from "./shapes/Rectangle";
 import { Tool } from "@/components/Canvas";
 import { IShape } from "./shapes/IShape";
 import { Pencil } from "./shapes/Pencil";
+import { Rhombus } from "./shapes/Rhombus";
 
 export class Game {
     private shapeManager = new ShapeManager();
     private socketService: SocketService;
-    private selectedTool: Tool = "circle";
+    private selectedTool: Tool = "hand";
     private clicked = false;
     private isPanning = false;
     private startX = 0;
@@ -21,6 +22,8 @@ export class Game {
     private lastPanX = 0;
     private lastPanY = 0;
     private isSpacePressed = false;
+    private undoStack: IShape[][] = [];
+    private redoStack: IShape[][] = [];
 
     constructor(
         private canvas: HTMLCanvasElement,
@@ -64,27 +67,15 @@ export class Game {
         ctx.restore();
     }
 
-    private wheelHandler = (e: WheelEvent) => {
-        e.preventDefault();
-        const rect = this.canvas.getBoundingClientRect();
-        const mouseX = e.clientX - rect.left;
-        const mouseY = e.clientY - rect.top;
-
-        // Convert mouse position to canvas coordinates
-        const canvasX = (mouseX - this.offsetX) / this.zoom;
-        const canvasY = (mouseY - this.offsetY) / this.zoom;
-
-        const delta = e.deltaY;
-        const zoomFactor = delta < 0 ? 1.1 : 1 / 1.1;
-        const newZoom = Math.min(Math.max(this.zoom * zoomFactor, 0.2), 5);
-
-        // Calculate new offset to keep the mouse position fixed
-        this.offsetX = mouseX - canvasX * newZoom;
-        this.offsetY = mouseY - canvasY * newZoom;
-        this.zoom = newZoom;
-
-        this.redrawCanvas();
-    };
+    setTool(tool: Tool) {
+        this.selectedTool = tool;
+        // Update cursor based on selected tool
+        if (tool === "hand") {
+            this.canvas.style.cursor = 'grab';
+        } else {
+            this.canvas.style.cursor = 'default';
+        }
+    }
 
     public zoomIn() {
         // 1. Găsim centrul canvas-ului
@@ -133,15 +124,57 @@ export class Game {
         this.redrawCanvas();
     }
 
-    setTool(tool: Tool) {
-        this.selectedTool = tool;
-        // Update cursor based on selected tool
-        if (tool === "hand") {
-            this.canvas.style.cursor = 'grab';
-        } else {
-            this.canvas.style.cursor = 'default';
+    private addToHistory() {
+        // Salvezi starea curentă (toate formele)
+        this.undoStack.push([...this.shapeManager.getShapes()]);
+        // Golești redo stack când se face o acțiune nouă
+        this.redoStack = [];
+    }
+
+    public undo() {
+        if (this.undoStack.length > 0) {
+            // Salvezi starea curentă în redo stack
+            this.redoStack.push([...this.shapeManager.getShapes()]);
+            // Aplici starea anterioară
+            const previousState = this.undoStack.pop()!;
+            this.shapeManager.setShapes(previousState);
+            this.redrawCanvas();
         }
     }
+
+    public redo() {
+        if (this.redoStack.length > 0) {
+            // Salvezi starea curentă în undo stack
+            this.undoStack.push([...this.shapeManager.getShapes()]);
+            // Aplici starea următoare
+            const nextState = this.redoStack.pop()!;
+            this.shapeManager.setShapes(nextState);
+            this.redrawCanvas();
+        }
+    }
+
+
+    private wheelHandler = (e: WheelEvent) => {
+        e.preventDefault();
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        // Convert mouse position to canvas coordinates
+        const canvasX = (mouseX - this.offsetX) / this.zoom;
+        const canvasY = (mouseY - this.offsetY) / this.zoom;
+
+        const delta = e.deltaY;
+        const zoomFactor = delta < 0 ? 1.1 : 1 / 1.1;
+        const newZoom = Math.min(Math.max(this.zoom * zoomFactor, 0.2), 5);
+
+        // Calculate new offset to keep the mouse position fixed
+        this.offsetX = mouseX - canvasX * newZoom;
+        this.offsetY = mouseY - canvasY * newZoom;
+        this.zoom = newZoom;
+
+        this.redrawCanvas();
+    };
 
     private mouseDownHandler = (e: MouseEvent) => {
         // Start panning on right click, space + left click, or hand tool
@@ -185,10 +218,13 @@ export class Game {
             shape = new Circle(this.startX + radius, this.startY + radius, radius);
         } else if (this.selectedTool === "pencil" && this.currentPencilPoints.length > 1) {
             shape = new Pencil([...this.currentPencilPoints]);
+        } else if (this.selectedTool === "romb") {
+            shape = new Rhombus(this.startX, this.startY, width, height);
         }
         this.currentPencilPoints = [];
 
         if (shape) {
+            this.addToHistory();
             this.shapeManager.addShape(shape);
             this.socketService.sendShape(shape);
         }
@@ -241,6 +277,9 @@ export class Game {
             this.currentPencilPoints.push({ x: currX, y: currY });
             const previewLine = new Pencil(this.currentPencilPoints);
             previewLine.draw(ctx);
+        } else if (this.selectedTool === "romb") {
+            const previewRhombus = new Rhombus(this.startX, this.startY, width, height);
+            previewRhombus.draw(ctx);
         }
         ctx.restore();
     };
@@ -250,6 +289,14 @@ export class Game {
             if (e.code === 'Space') {
                 this.isSpacePressed = true;
                 this.canvas.style.cursor = 'grab';
+            }
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault();
+                if (e.shiftKey) {
+                    this.redo();
+                } else {
+                    this.undo();
+                }
             }
         });
 

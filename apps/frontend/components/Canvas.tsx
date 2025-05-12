@@ -3,11 +3,11 @@ import { IconButton } from "./IconButton";
 import { PiPencil } from "react-icons/pi";
 import { BiCircle, BiRectangle } from "react-icons/bi";
 import { Game } from "@/draw/Game";
-import { IoMdAdd, IoMdRemove, IoMdRefresh } from "react-icons/io";
-import { BsHandIndex, BsHandIndexThumb } from "react-icons/bs";
+import { IoMdAdd, IoMdRemove, IoMdRefresh, IoMdRedo, IoMdUndo } from "react-icons/io";
 import { IoHandRightOutline } from "react-icons/io5";
+import { CgShapeRhombus } from "react-icons/cg";
 
-export type Tool = "circle" | "rect" | "pencil" | "hand"
+export type Tool = "circle" | "rect" | "pencil" | "hand" | "romb"
 
 export function Canvas({
     roomId,
@@ -18,7 +18,7 @@ export function Canvas({
 }) {
     const canvasRef = useRef<HTMLCanvasElement>(null)
     const [game, setGame] = useState<Game>()
-    const [selectedTool, setSelectedTool] = useState<Tool>("circle")
+    const [selectedTool, setSelectedTool] = useState<Tool>("hand")
 
     useEffect(() => {
         const handleResize = () => {
@@ -97,6 +97,10 @@ function TopBar({
                         activated={selectedTool === "circle"}
                         icon={<BiCircle />}
                         onClick={() => { setSelectedTool("circle") }} />
+                    <IconButton
+                        activated={selectedTool === "romb"}
+                        icon={<CgShapeRhombus />}
+                        onClick={() => { setSelectedTool("romb") }} />
                 </div>
                 <div className="flex gap-2 bg-white/10 p-2 rounded-lg">
                     <IconButton
@@ -111,6 +115,16 @@ function TopBar({
                         activated={false}
                         icon={<IoMdRefresh />}
                         onClick={() => { game?.resetZoom() }} />
+                </div>
+                <div className="flex gap-2 bg-white/10 p-2 rounded-lg">
+                    <IconButton
+                        activated={false}
+                        icon={<IoMdUndo />}
+                        onClick={() => { game?.undo() }} />
+                    <IconButton
+                        activated={false}
+                        icon={<IoMdRedo />}
+                        onClick={() => { game?.redo() }} />
                 </div>
             </div>
         </div>

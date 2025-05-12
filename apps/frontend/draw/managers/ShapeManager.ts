@@ -8,47 +8,14 @@ export class ShapeManager {
     private shapes: IShape[] = [];
     private initialized = false;
 
-    getShapesCopy(): IShape[] {
-        const shapesData = JSON.parse(JSON.stringify(this.shapes));
-        return shapesData.map((shapeData: any) => {
-            if (shapeData.type === "circle") {
-                return new Circle(
-                    shapeData.centerX,
-                    shapeData.centerY,
-                    shapeData.radius
-                );
-            } else if (shapeData.type === "rect") {
-                return new Rectangle(
-                    shapeData.x,
-                    shapeData.y,
-                    shapeData.width,
-                    shapeData.height
-                );
-            } else if (shapeData.type === "pencil") {
-                return new Pencil(shapeData.points);
-            }
-            throw new Error(`Unknown shape type: ${shapeData.type}`);
-        });
+    getShapes(): IShape[] {
+        return [...this.shapes];  // Returnăm o copie pentru siguranță
     }
 
     setShapes(shapes: IShape[]) {
-        this.shapes = shapes.map(shape => {
-            // Asigură-te că shape-urile sunt deja instanțe corecte
-            if (shape instanceof Circle || shape instanceof Rectangle || shape instanceof Pencil) {
-                return shape;
-            }
-            // Dacă nu, reconstruiește-le (pentru cazurile de undo/redo)
-            const shapeData = JSON.parse(JSON.stringify(shape));
-            if (shapeData.type === "circle") {
-                return new Circle(shapeData.centerX, shapeData.centerY, shapeData.radius);
-            } else if (shapeData.type === "rect") {
-                return new Rectangle(shapeData.x, shapeData.y, shapeData.width, shapeData.height);
-            } else if (shapeData.type === "pencil") {
-                return new Pencil(shapeData.points);
-            }
-            throw new Error(`Unknown shape type: ${shapeData.type}`);
-        });
+        this.shapes = [...shapes];  // Facem o copie pentru siguranță
     }
+
 
     async loadInitialShapes(roomId: string): Promise<boolean> {
         try {
