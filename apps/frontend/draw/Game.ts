@@ -308,8 +308,10 @@ export class Game {
         if (this.selectedTool === "rect") {
             shape = new Rectangle(this.startX, this.startY, width, height);
         } else if (this.selectedTool === "circle") {
-            const radius = Math.max(width, height) / 2;
-            shape = new Circle(this.startX + radius, this.startY + radius, radius);
+            const radius = Math.max(Math.abs(width), Math.abs(height)) / 2;
+            const centerX = this.startX + (width < 0 ? -radius : radius);
+            const centerY = this.startY + (height < 0 ? -radius : radius);
+            shape = new Circle(centerX, centerY, radius);
         } else if (this.selectedTool === "pencil" && this.currentPencilPoints.length > 1) {
             shape = new Pencil([...this.currentPencilPoints]);
         } else if (this.selectedTool === "romb") {
@@ -480,10 +482,12 @@ export class Game {
             );
             previewRect.draw(ctx);
         } else if (this.selectedTool === "circle") {
-            const radius = Math.max(width, height) / 2;
+            const radius = Math.max(Math.abs(width), Math.abs(height)) / 2;
+            const centerX = this.startX + (width < 0 ? -radius : radius);
+            const centerY = this.startY + (height < 0 ? -radius : radius);
             const previewCircle = new Circle(
-                this.startX + radius,
-                this.startY + radius,
+                centerX,
+                centerY,
                 radius
             );
             previewCircle.draw(ctx);
