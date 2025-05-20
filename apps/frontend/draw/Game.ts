@@ -83,6 +83,10 @@ export class Game {
     }
 
     setTool(tool: Tool) {
+        if (this.selectedShape) {
+            this.selectedShape.isSelected = false;
+            this.selectedShape = null;
+        }
         if (this.selectedTool === "line" && this.currentPolyline) {
             // Finalizăm linia când schimbăm tool-ul
             this.addToHistory();  // Adaugă această linie
@@ -101,6 +105,8 @@ export class Game {
         if (this.onToolChange) {
             this.onToolChange(tool);
         }
+        this.redrawCanvas();
+
     }
 
     public zoomIn() {
@@ -203,8 +209,22 @@ export class Game {
     };
 
     private mouseDownHandler = (e: MouseEvent) => {
+        // Deselectăm forma când facem click în altă parte
+        if (this.selectedShape && this.selectedTool === "select") {
+            const rect = this.canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left - this.offsetX) / this.zoom;
+            const y = (e.clientY - rect.top - this.offsetY) / this.zoom;
+
+            // Verificăm dacă am dat click pe forma selectată
+            if (!this.selectedShape.containsPoint(x, y)) {
+                this.selectedShape.isSelected = false;
+                this.selectedShape = null;
+                this.redrawCanvas();
+            }
+        }
+
         // Start panning on right click, space + left click, or hand tool
-        if (e.button === 2 || (e.button === 0 && (this.isSpacePressed || this.selectedTool === "hand"))) {
+        if ((e.button === 0 && (this.isSpacePressed || this.selectedTool === "hand"))) {
             this.isPanning = true;
             this.lastPanX = e.clientX;
             this.lastPanY = e.clientY;
@@ -556,8 +576,6 @@ export class Game {
         this.canvas.addEventListener("mouseup", this.mouseUpHandler);
         this.canvas.addEventListener("mousemove", this.mouseMoveHandler);
         this.canvas.addEventListener("wheel", this.wheelHandler);
-        // Prevent context menu on right click
-        this.canvas.addEventListener("contextmenu", (e) => e.preventDefault());
     }
 
     destroy() {
@@ -565,7 +583,6 @@ export class Game {
         this.canvas.removeEventListener("mouseup", this.mouseUpHandler);
         this.canvas.removeEventListener("mousemove", this.mouseMoveHandler);
         this.canvas.removeEventListener("wheel", this.wheelHandler);
-        this.canvas.removeEventListener("contextmenu", (e) => e.preventDefault());
         window.removeEventListener('keydown', this.initKeyboardHandlers);
         window.removeEventListener('keyup', this.initKeyboardHandlers);
     }

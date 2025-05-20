@@ -6,7 +6,6 @@
     "./*": "./src/*.tsx",
     "./button": "./src/button.tsx",
     "./input": "./src/input.tsx",
-    "./header": "./src/header.tsx",
     "./title": "./src/title.tsx"
   },
   "scripts": {

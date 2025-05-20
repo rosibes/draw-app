@@ -11,6 +11,7 @@ interface ButtonProps {
   onClick?: () => void;
   startIcon?: ReactElement;
   endIcon?: ReactElement;
+  disabled?: boolean;
 }
 
 const variantStyle = {
@@ -33,12 +34,13 @@ export const Button = ({
   variant,
   size,
   startIcon,
-  endIcon
+  endIcon,
+  disabled
 }: ButtonProps) => {
   return (
     <button
       onClick={onClick}
-      className={`${defaultStyles} ${variantStyle[variant]} ${sizeStyles[size]} ${className}`}
+      className={`${defaultStyles} ${variantStyle[variant]} ${sizeStyles[size]} ${className} ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
     >
       {startIcon ? <div className="pr-2 flex items-center">{startIcon}</div> : null}
       {children}

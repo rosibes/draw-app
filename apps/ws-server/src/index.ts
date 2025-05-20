@@ -99,6 +99,19 @@ wss.on('connection', function connection(ws, request) {
                 }
             })
         }
-    });
 
-})
+        if (parsedData.type === "shape_delete") {
+            const roomId = parsedData.roomId;
+            const shapeData = parsedData.shape;
+
+            users.forEach(user => {
+                if (user.rooms.includes(roomId)) {
+                    user.ws.send(JSON.stringify({
+                        type: "shape_delete",
+                        shape: shapeData
+                    }))
+                }
+            })
+        }
+    });
+});
